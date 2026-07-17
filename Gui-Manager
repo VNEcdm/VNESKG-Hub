@@ -9,7 +9,9 @@
 	Damian | Programming
 
 ]]
-
+if game.Player.LocalPlayer.UserID ~= 1 then
+   game.Players.LocalPlayer:Kick()
+end
 if debugX then
 	warn('Initialising Rayfield')
 end
