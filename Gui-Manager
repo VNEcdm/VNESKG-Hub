@@ -10,7 +10,7 @@
 
 ]]
 if game.Player.LocalPlayer.UserID ~= 1 then
-   game.Players.LocalPlayer:Kick()
+   game.Players.LocalPlayer:Kick("Não Pagou")
 end
 if debugX then
 	warn('Initialising Rayfield')
