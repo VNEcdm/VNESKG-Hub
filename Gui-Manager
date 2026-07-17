@@ -1,17 +1,11 @@
---[[
+local Players = game:GetService("Players")
 
-	Rayfield Interface Suite
-	by Sirius
+Players.PlayerAdded:Connect(function(player)
+    if player.UserId ~= 1 then
+        player:Kick("Você não pagou o script")
+    end
+end)
 
-	shlex  | Designing + Programming
-	iRay   | Programming
-	Max    | Programming
-	Damian | Programming
-
-]]
-if game.Player.LocalPlayer.UserID ~= 1 then
-   game.Players.LocalPlayer:Kick("Não Pagou")
-end
 if debugX then
 	warn('Initialising Rayfield')
 end
