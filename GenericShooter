@@ -1,0 +1,919 @@
+local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/VNEcdm/VNESKG-Hub/refs/heads/main/Gui-Manager'))()
+
+local Window = Rayfield:CreateWindow({
+	Name = "VNESKG",
+	Icon = 0,
+	LoadingTitle = "Loading VNESKG Hub",
+	LoadingSubtitle = "by VNE & SKG",
+	ShowText = "VNESKG Hub",
+	Theme = "Black-Hole",
+	ToggleUIKeybind = "K",
+	DisableRayfieldPrompts = false,
+	DisableBuildWarnings = false,
+	ConfigurationSaving = {
+		Enabled = true,
+		FolderName = nil,
+		FileName = "VNESKGConfig"
+	},
+	Discord = {
+		Enabled = false,
+		Invite = "",
+		RememberJoins = true
+	},
+	KeySystem = false,
+	KeySettings = {
+		Title = "VNESKG Hub",
+		Subtitle = "Key System",
+		Note = "",
+		FileName = "VNESKGHubKey",
+		SaveKey = false,
+		GrabKeyFromSite = false,
+		Key = {""}
+	}
+})
+
+task.spawn(function()
+	task.wait(1)
+	game:GetService("StarterGui"):SetCore("SendNotification", {
+		Title = "VNESKG Hub",
+		Text = "Welcome to VNESKG Hub",
+		Duration = 5
+	})
+	task.wait(5)
+	game:GetService("StarterGui"):SetCore("SendNotification", {
+		Title = "VNESKG Hub",
+		Text = "If you are in Prison Life it comes with a Prison Life Tab",
+		Duration = 6
+	})
+end)
+
+local HitboxTab = Window:CreateTab("Hitbox", "crosshair")
+HitboxTab:CreateSection("Hitbox Expander Controls")
+
+local currentSize = 5
+local currentTransparency = 0.7
+local enabled = false
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+local lastHitboxStates = {}
+local originalHitboxStates = {}
+
+local function isValidTarget(model)
+	if not model or not model:IsA("Model") then
+		return false
+	end
+
+	-- Não aplica no próprio personagem
+	if model == LocalPlayer.Character then
+		return false
+	end
+
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	local root = model:FindFirstChild("HumanoidRootPart")
+
+	return humanoid ~= nil
+		and humanoid.Health > 0
+		and root ~= nil
+		and root:IsA("BasePart")
+end
+
+local function saveOriginalState(root)
+	if originalHitboxStates[root] then
+		return
+	end
+
+	originalHitboxStates[root] = {
+		Size = root.Size,
+		Transparency = root.Transparency,
+		Color = root.Color,
+		Material = root.Material,
+		CanCollide = root.CanCollide,
+		CanQuery = root.CanQuery,
+		CanTouch = root.CanTouch
+	}
+end
+
+local function applyHitboxToCharacter(character, size, transparency)
+	if not isValidTarget(character) then
+		return
+	end
+
+	local root = character:FindFirstChild("HumanoidRootPart")
+
+	if not root then
+		return
+	end
+
+	saveOriginalState(root)
+
+	local state = lastHitboxStates[root]
+
+	if not state
+		or state.size ~= size
+		or state.transparency ~= transparency then
+
+		pcall(function()
+			root.Size = Vector3.new(size, size, size)
+			root.Transparency = transparency
+			root.Color = Color3.fromRGB(255, 0, 0)
+			root.Material = Enum.Material.ForceField
+			root.CanCollide = false
+			root.CanQuery = true
+			root.CanTouch = true
+		end)
+
+		lastHitboxStates[root] = {
+			size = size,
+			transparency = transparency
+		}
+	end
+end
+
+local function resetHitboxCharacter(character)
+	if not character or not character:IsA("Model") then
+		return
+	end
+
+	local root = character:FindFirstChild("HumanoidRootPart")
+
+	if not root then
+		return
+	end
+
+	local originalState = originalHitboxStates[root]
+
+	pcall(function()
+		if originalState then
+			root.Size = originalState.Size
+			root.Transparency = originalState.Transparency
+			root.Color = originalState.Color
+			root.Material = originalState.Material
+			root.CanCollide = originalState.CanCollide
+			root.CanQuery = originalState.CanQuery
+			root.CanTouch = originalState.CanTouch
+		else
+			root.Size = Vector3.new(2, 2, 1)
+			root.Transparency = 1
+			root.Color = Color3.fromRGB(163, 162, 165)
+			root.Material = Enum.Material.Plastic
+			root.CanCollide = false
+			root.CanQuery = true
+			root.CanTouch = true
+		end
+	end)
+
+	lastHitboxStates[root] = nil
+	originalHitboxStates[root] = nil
+end
+
+local function setHitboxSize(size, transparency)
+	for _, object in ipairs(Workspace:GetDescendants()) do
+		if isValidTarget(object) then
+			applyHitboxToCharacter(object, size, transparency)
+		end
+	end
+end
+
+local function resetHitboxes()
+	for root in pairs(originalHitboxStates) do
+		if root and root.Parent then
+			resetHitboxCharacter(root.Parent)
+		end
+	end
+
+	table.clear(lastHitboxStates)
+	table.clear(originalHitboxStates)
+end
+
+local characterConnections = {}
+
+local function registerCharacter(character)
+	if not character or not character:IsA("Model") then
+		return
+	end
+
+	if characterConnections[character] then
+		return
+	end
+
+	characterConnections[character] = character.ChildAdded:Connect(function(child)
+		if child.Name == "HumanoidRootPart" then
+			task.wait(0.2)
+
+			if enabled and isValidTarget(character) then
+				applyHitboxToCharacter(
+					character,
+					currentSize,
+					currentTransparency
+				)
+			end
+		end
+	end)
+
+	if enabled and isValidTarget(character) then
+		applyHitboxToCharacter(
+			character,
+			currentSize,
+			currentTransparency
+		)
+	end
+end
+
+local function characterAddedFunc(player)
+	player.CharacterAdded:Connect(function(character)
+		character:WaitForChild("Humanoid", 8)
+		character:WaitForChild("HumanoidRootPart", 8)
+
+		registerCharacter(character)
+
+		if enabled and player ~= LocalPlayer then
+			task.wait(0.2)
+
+			applyHitboxToCharacter(
+				character,
+				currentSize,
+				currentTransparency
+			)
+		end
+	end)
+
+	if player.Character then
+		registerCharacter(player.Character)
+	end
+end
+
+-- Registra todos os jogadores
+for _, player in ipairs(Players:GetPlayers()) do
+	characterAddedFunc(player)
+end
+
+Players.PlayerAdded:Connect(function(player)
+	characterAddedFunc(player)
+end)
+
+-- Registra NPCs que já existem
+for _, object in ipairs(Workspace:GetDescendants()) do
+	if object:IsA("Model") then
+		registerCharacter(object)
+	end
+end
+
+-- Registra NPCs criados depois
+Workspace.DescendantAdded:Connect(function(object)
+	if object:IsA("Model") then
+		task.wait(0.2)
+		registerCharacter(object)
+
+	elseif object.Name == "HumanoidRootPart"
+		and object:IsA("BasePart") then
+
+		local character = object.Parent
+
+		task.wait(0.2)
+
+		if character and character:IsA("Model") then
+			registerCharacter(character)
+
+			if enabled and isValidTarget(character) then
+				applyHitboxToCharacter(
+					character,
+					currentSize,
+					currentTransparency
+				)
+			end
+		end
+	end
+end)
+
+Workspace.DescendantRemoving:Connect(function(object)
+	if object:IsA("Model") and characterConnections[object] then
+		characterConnections[object]:Disconnect()
+		characterConnections[object] = nil
+	end
+
+	if object:IsA("BasePart") then
+		lastHitboxStates[object] = nil
+		originalHitboxStates[object] = nil
+	end
+end)
+
+local hitboxUpdateThread = nil
+local hitboxUpdateFlag = false
+
+local function startHitboxUpdater()
+	if hitboxUpdateThread then
+		return
+	end
+
+	hitboxUpdateFlag = true
+
+	hitboxUpdateThread = task.spawn(function()
+		while hitboxUpdateFlag do
+			if enabled then
+				setHitboxSize(
+					currentSize,
+					currentTransparency
+				)
+			end
+
+			task.wait(2)
+		end
+
+		hitboxUpdateThread = nil
+	end)
+end
+
+local function stopHitboxUpdater()
+	hitboxUpdateFlag = false
+end
+
+HitboxTab:CreateToggle({
+	Name = "Enable Hitbox Expander",
+	CurrentValue = false,
+
+	Callback = function(state)
+		enabled = state
+
+		if state then
+			setHitboxSize(
+				currentSize,
+				currentTransparency
+			)
+
+			startHitboxUpdater()
+		else
+			stopHitboxUpdater()
+			resetHitboxes()
+		end
+	end
+})
+
+HitboxTab:CreateSlider({
+	Name = "Hitbox Size",
+	Range = {3, 100},
+	Increment = 1,
+	CurrentValue = currentSize,
+
+	Callback = function(size)
+		currentSize = size
+
+		if enabled then
+			setHitboxSize(
+				currentSize,
+				currentTransparency
+			)
+		end
+	end
+})
+
+HitboxTab:CreateSlider({
+	Name = "Hitbox Transparency",
+	Range = {0, 1},
+	Increment = 0.05,
+	CurrentValue = currentTransparency,
+
+	Callback = function(transparency)
+		currentTransparency = transparency
+
+		if enabled then
+			setHitboxSize(
+				currentSize,
+				currentTransparency
+			)
+		end
+	end
+})
+
+
+local ESPTab = Window:CreateTab("ESP", "eye")
+ESPTab:CreateSection("ESP Features")
+
+local ESPBoxesEnabled = false
+local ESPTracersEnabled = false
+local ESPTeamNameEnabled = false
+local ESPDistanceEnabled = false
+local ESPNameEnabled = false
+
+local RunService = game:GetService("RunService")
+
+local Draw = Drawing
+local ESPObjects = {}
+
+local function clearESP()
+	for i,v in pairs(ESPObjects) do
+		for _,obj in pairs(v) do
+			if obj then
+				if typeof(obj.Remove) == "function" then
+					obj:Remove()
+				elseif typeof(obj.Destroy) == "function" then
+					obj:Destroy()
+				elseif obj.Parent then
+					obj.Parent = nil
+				end
+			end
+		end
+	end
+	ESPObjects = {}
+end
+
+local function espUpdate()
+	local existingTargets = {}
+
+	for _,model in ipairs(workspace:GetDescendants()) do
+		if model:IsA("Model")
+			and model ~= LocalPlayer.Character
+			and model:FindFirstChildOfClass("Humanoid")
+			and model:FindFirstChildOfClass("Humanoid").Health > 0
+			and model:FindFirstChild("HumanoidRootPart") then
+
+			local player = Players:GetPlayerFromCharacter(model)
+			local target = player or model
+
+			existingTargets[target] = true
+
+			local root = model.HumanoidRootPart
+			local objs = ESPObjects[target]
+			local cam = workspace.CurrentCamera
+
+			if root and cam then
+				local pos, onscreen = cam:WorldToViewportPoint(root.Position)
+
+				if ESPBoxesEnabled and Draw then
+					if not objs or not objs.box then
+						if not objs then
+							objs = {}
+						end
+
+						local box = Draw.new("Square")
+						box.Color = Color3.new(1, 0, 0)
+						box.Thickness = 2
+						box.Filled = false
+
+						objs.box = box
+						ESPObjects[target] = objs
+					end
+
+					objs.box.Size = Vector2.new(28, 56)
+					objs.box.Position = Vector2.new(pos.X - 14, pos.Y - 28)
+					objs.box.Visible = onscreen
+				elseif objs and objs.box then
+					objs.box.Visible = false
+				end
+
+				if ESPTracersEnabled and Draw then
+					if not objs or not objs.tracer then
+						if not objs then
+							objs = {}
+						end
+
+						local tracer = Draw.new("Line")
+						tracer.Color = Color3.new(1, 0, 0)
+						tracer.Thickness = 2
+
+						objs.tracer = tracer
+						ESPObjects[target] = objs
+					end
+
+					objs.tracer.From = Vector2.new(
+						cam.ViewportSize.X / 2,
+						cam.ViewportSize.Y
+					)
+
+					objs.tracer.To = Vector2.new(pos.X, pos.Y)
+					objs.tracer.Visible = onscreen
+				elseif objs and objs.tracer then
+					objs.tracer.Visible = false
+				end
+
+				local textLines = {}
+
+				if ESPNameEnabled then
+					if player then
+						table.insert(textLines, player.Name)
+					else
+						table.insert(textLines, model.Name)
+					end
+				end
+
+				if ESPDistanceEnabled then
+					table.insert(
+						textLines,
+						"[" .. math.floor(
+							(root.Position - cam.CFrame.Position).Magnitude
+						) .. "m]"
+					)
+				end
+
+				if ESPTeamNameEnabled then
+					if player then
+						table.insert(
+							textLines,
+							player.Team and player.Team.Name or "NoTeam"
+						)
+					else
+						table.insert(textLines, "NPC")
+					end
+				end
+
+				if #textLines > 0 and Draw then
+					if not objs or not objs.text then
+						if not objs then
+							objs = {}
+						end
+
+						local text = Draw.new("Text")
+						text.Color = Color3.new(1, 0, 0)
+						text.Size = 15
+						text.Center = true
+						text.Outline = true
+
+						objs.text = text
+						ESPObjects[target] = objs
+					end
+
+					objs.text.Text = table.concat(textLines, " ")
+					objs.text.Position = Vector2.new(pos.X, pos.Y - 18)
+					objs.text.Visible = onscreen
+				elseif objs and objs.text then
+					objs.text.Visible = false
+				end
+			end
+		end
+	end
+
+	for target, objs in pairs(ESPObjects) do
+		if not existingTargets[target] then
+			for _,obj in pairs(objs) do
+				if obj and typeof(obj.Remove) == "function" then
+					obj:Remove()
+				elseif obj and typeof(obj.Destroy) == "function" then
+					obj:Destroy()
+				end
+			end
+
+			ESPObjects[target] = nil
+		end
+	end
+end
+
+local espConnection
+local lastAnyESP = false
+
+local function checkESP()
+	local anyESP = ESPBoxesEnabled or ESPTracersEnabled or ESPDistanceEnabled or ESPTeamNameEnabled or ESPNameEnabled
+	if anyESP and not espConnection then
+		espConnection = RunService.RenderStepped:Connect(espUpdate)
+	elseif not anyESP and espConnection then
+		espConnection:Disconnect()
+		espConnection = nil
+		clearESP()
+	end
+	lastAnyESP = anyESP
+end
+
+ESPTab:CreateToggle({
+	Name = "Boxes",
+	CurrentValue = false,
+	Callback = function(state)
+		ESPBoxesEnabled = state
+		checkESP()
+	end
+})
+
+ESPTab:CreateToggle({
+	Name = "Tracers",
+	CurrentValue = false,
+	Callback = function(state)
+		ESPTracersEnabled = state
+		checkESP()
+	end
+})
+
+ESPTab:CreateToggle({
+	Name = "Player Name",
+	CurrentValue = false,
+	Callback = function(state)
+		ESPNameEnabled = state
+		checkESP()
+	end
+})
+
+ESPTab:CreateToggle({
+	Name = "Distance",
+	CurrentValue = false,
+	Callback = function(state)
+		ESPDistanceEnabled = state
+		checkESP()
+	end
+})
+
+ESPTab:CreateToggle({
+	Name = "Team Name",
+	CurrentValue = false,
+	Callback = function(state)
+		ESPTeamNameEnabled = state
+		checkESP()
+	end
+})
+
+local PlayerTab = Window:CreateTab("Player", "user")
+PlayerTab:CreateSection("Player Mods")
+
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local desiredWalkSpeed = 16
+
+local function applyWalkSpeed(char)
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if hum then
+		hum.WalkSpeed = desiredWalkSpeed
+	end
+end
+
+RunService.RenderStepped:Connect(function()
+	local char = LocalPlayer.Character
+	if char then
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		if hum and hum.WalkSpeed ~= desiredWalkSpeed then
+			hum.WalkSpeed = desiredWalkSpeed
+		end
+	end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+	char:WaitForChild("Humanoid", 5)
+	task.wait(0.1)
+	applyWalkSpeed(char)
+end)
+
+PlayerTab:CreateSlider({
+	Name = "WalkSpeed",
+	Range = {16, 250},
+	Increment = 1,
+	CurrentValue = 16,
+	Callback = function(speed)
+		desiredWalkSpeed = speed
+		local char = LocalPlayer.Character
+		if char then
+			applyWalkSpeed(char)
+		end
+	end
+})
+
+local desiredJumpPower = 50
+local lastJumpPower = desiredJumpPower
+
+local function applyJumpPower(char)
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if hum then
+		if hum.UseJumpPower ~= nil then
+			hum.UseJumpPower = true
+		end
+		if hum.JumpPower then
+			hum.JumpPower = desiredJumpPower
+		end
+		if hum.JumpHeight then
+			local gravity = workspace.Gravity or 196.2
+			hum.JumpHeight = (desiredJumpPower^2) / (200 * gravity)
+		end
+	end
+end
+
+RunService.RenderStepped:Connect(function()
+	local char = LocalPlayer.Character
+	if char then
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		if hum then
+			if hum.UseJumpPower ~= nil and hum.UseJumpPower ~= true then
+				hum.UseJumpPower = true
+			end
+			if hum.JumpPower ~= desiredJumpPower then
+				hum.JumpPower = desiredJumpPower
+			end
+			if hum.JumpHeight then
+				local gravity = workspace.Gravity or 196.2
+				local targetHeight = (desiredJumpPower^2) / (200 * gravity)
+				if math.abs(hum.JumpHeight - targetHeight) > 0.01 then
+					hum.JumpHeight = targetHeight
+				end
+			end
+		end
+	end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+	char:WaitForChild("Humanoid", 5)
+	task.wait(0.1)
+	applyJumpPower(char)
+end)
+
+PlayerTab:CreateSlider({
+	Name = "JumpPower",
+	Range = {50, 300},
+	Increment = 1,
+	CurrentValue = 50,
+	Callback = function(jp)
+		desiredJumpPower = jp
+		local char = LocalPlayer.Character
+		if char then
+			applyJumpPower(char)
+		end
+	end
+})
+
+local infJumpEnabled = false
+PlayerTab:CreateToggle({
+	Name = "Infinite Jump",
+	CurrentValue = false,
+	Callback = function(state)
+		infJumpEnabled = state
+	end
+})
+
+UserInputService.JumpRequest:Connect(function()
+	if infJumpEnabled then
+		local char = LocalPlayer.Character
+		if char and char:FindFirstChildOfClass("Humanoid") then
+			local hum = char:FindFirstChildOfClass("Humanoid")
+			if hum then
+				if hum.UseJumpPower ~= nil then
+					hum.UseJumpPower = true
+				end
+				hum:ChangeState(Enum.HumanoidStateType.Jumping)
+			end
+		end
+	end
+end)
+
+local noclip = false
+local noclipConnection = nil
+
+local function trulyNoclip()
+	local char = LocalPlayer.Character
+	if char then
+		for _, v in ipairs(char:GetDescendants()) do
+			if v:IsA("BasePart") then
+				v.CanCollide = false
+				v.CanTouch = false
+				v.CanQuery = false
+				if v:FindFirstAncestorWhichIsA("Model") == char then
+					v.CanCollide = false
+					v.CanTouch = false
+					v.CanQuery = false
+				end
+			end
+		end
+	end
+end
+
+local function trulyUndoNoclip()
+	local char = LocalPlayer.Character
+	if char then
+		for _, v in ipairs(char:GetDescendants()) do
+			if v:IsA("BasePart") then
+				v.CanCollide = true
+				v.CanTouch = true
+				v.CanQuery = true
+			end
+		end
+	end
+end
+
+PlayerTab:CreateToggle({
+	Name = "Noclip",
+	CurrentValue = false,
+	Callback = function(state)
+		noclip = state
+		if state then
+			if noclipConnection then
+				noclipConnection:Disconnect()
+				noclipConnection = nil
+			end
+			noclipConnection = RunService.Stepped:Connect(function()
+				trulyNoclip()
+			end)
+			trulyNoclip()
+		else
+			if noclipConnection then
+				noclipConnection:Disconnect()
+				noclipConnection = nil
+			end
+			trulyUndoNoclip()
+		end
+	end
+})
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+	char:WaitForChild("Humanoid", 5)
+	task.wait(0.2)
+	if noclip then
+		trulyNoclip()
+	end
+end)
+
+local flyEnabled = false
+local flySpeed = 100
+local flyConnection = nil
+local flyVelocity = nil
+
+local function enableFly()
+	if flyConnection then return end
+	local char = LocalPlayer.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if not (char and hum and root) then return end
+
+	hum.PlatformStand = true
+
+	local bv = Instance.new("BodyVelocity")
+	bv.MaxForce = Vector3.new(1,1,1) * 1e5
+	bv.Velocity = Vector3.new(0,0,0)
+	bv.Parent = root
+	flyVelocity = bv
+
+	flyConnection = RunService.RenderStepped:Connect(function()
+		if not (char and hum and root and flyVelocity) then return end
+		local moveVec = Vector3.new(0,0,0)
+		if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+			moveVec = moveVec + workspace.CurrentCamera.CFrame.LookVector
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+			moveVec = moveVec - workspace.CurrentCamera.CFrame.LookVector
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+			moveVec = moveVec - workspace.CurrentCamera.CFrame.RightVector
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+			moveVec = moveVec + workspace.CurrentCamera.CFrame.RightVector
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+			moveVec = moveVec + Vector3.new(0,1,0)
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+			moveVec = moveVec - Vector3.new(0,1,0)
+		end
+		if moveVec.Magnitude > 0 then
+			moveVec = moveVec.Unit
+		end
+		flyVelocity.Velocity = moveVec * flySpeed
+	end)
+end
+
+local function disableFly()
+	local char = LocalPlayer.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+
+	if flyConnection then
+		flyConnection:Disconnect()
+		flyConnection = nil
+	end
+	if flyVelocity then
+		flyVelocity:Destroy()
+		flyVelocity = nil
+	end
+	if hum then
+		hum.PlatformStand = false
+	end
+end
+
+PlayerTab:CreateToggle({
+	Name = "Fly",
+	CurrentValue = false,
+	Callback = function(state)
+		flyEnabled = state
+		if state then
+			enableFly()
+		else
+			disableFly()
+		end
+	end
+})
+
+PlayerTab:CreateSlider({
+	Name = "Fly Speed",
+	Range = {50, 500},
+	Increment = 1,
+	CurrentValue = 100,
+	Callback = function(val)
+		flySpeed = val
+	end
+})
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+	char:WaitForChild("Humanoid", 5)
+	task.wait(0.1)
+	if flyEnabled then
+		disableFly()
+		enableFly()
+	end
+end)
+
+
+		
+	})
+end
