@@ -912,8 +912,3 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 		enableFly()
 	end
 end)
-
-
-		
-	})
-end
